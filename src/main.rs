@@ -3,6 +3,8 @@ mod canvas;
 mod node;
 mod clipboard;
 mod input;
+mod tools;
+mod ui;
 
 use eframe::{egui, Result};
 
