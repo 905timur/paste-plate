@@ -4,6 +4,7 @@ use image::{ImageBuffer, RgbaImage};
 use crate::node::ImageNode;
 
 pub fn paste_from_clipboard(app: &mut crate::app::PastePlateApp, ctx: &Context) {
+    // Try arboard first
     let mut clipboard = match arboard::Clipboard::new() {
         Ok(cb) => cb,
         Err(e) => {
@@ -12,50 +13,83 @@ pub fn paste_from_clipboard(app: &mut crate::app::PastePlateApp, ctx: &Context) 
         }
     };
 
-    println!("Attempting to get image from clipboard...");
+    println!("Attempting to get image from clipboard via arboard...");
     match clipboard.get_image() {
         Ok(image_data) => {
-            println!("Got image from clipboard: {}x{}", image_data.width, image_data.height);
+            println!("Got image from arboard: {}x{}", image_data.width, image_data.height);
             let width = image_data.width as u32;
             let height = image_data.height as u32;
             let rgba_image: RgbaImage = ImageBuffer::from_raw(width, height, image_data.bytes.into_owned())
                 .expect("Failed to create RgbaImage from clipboard data");
             add_image_node(app, ctx, rgba_image);
+            return;
         }
         Err(e) => {
-            println!("Failed to get image from clipboard: {:?}", e);
-            println!("Attempting to read text/uri fallback...");
-            if let Ok(text) = clipboard.get_text() {
-                let first_line = text.lines().next().unwrap_or("").trim();
-                
-                let mut path = None;
-                if first_line.starts_with("file://") {
-                    if let Ok(url) = url::Url::parse(first_line) {
-                        if let Ok(file_path) = url.to_file_path() {
-                            path = Some(file_path);
-                        }
-                    }
-                } else {
-                    let p = std::path::PathBuf::from(first_line);
-                    if p.is_absolute() {
-                        path = Some(p);
+            println!("arboard failed: {:?}", e);
+        }
+    }
+
+    // Try wl-paste fallback for Wayland
+    println!("Attempting wl-paste fallback...");
+    match std::process::Command::new("wl-paste")
+        .arg("--type")
+        .arg("image/png")
+        .output()
+    {
+        Ok(output) if output.status.success() => {
+            println!("wl-paste succeeded, loading image...");
+            match image::load_from_memory(&output.stdout) {
+                Ok(img) => {
+                    println!("Loaded image from wl-paste output");
+                    add_image_node(app, ctx, img.into_rgba8());
+                    return;
+                }
+                Err(err) => {
+                    println!("Failed to decode wl-paste image: {:?}", err);
+                }
+            }
+        }
+        Ok(output) => {
+            println!("wl-paste failed with status: {:?}", output.status);
+        }
+        Err(e) => {
+            println!("wl-paste not available: {:?}", e);
+        }
+    }
+
+    // Fallback: try text/uri parsing
+    println!("Attempting text/uri fallback...");
+    if let Ok(mut clipboard) = arboard::Clipboard::new() {
+        if let Ok(text) = clipboard.get_text() {
+            let first_line = text.lines().next().unwrap_or("").trim();
+            
+            let mut path = None;
+            if first_line.starts_with("file://") {
+                if let Ok(url) = url::Url::parse(first_line) {
+                    if let Ok(file_path) = url.to_file_path() {
+                        path = Some(file_path);
                     }
                 }
-                
-                if let Some(p) = path {
-                    println!("Parsed file path from clipboard: {:?}", p);
-                    match image::open(&p) {
-                        Ok(img) => {
-                            println!("Successfully loaded image from {:?}", p);
-                            add_image_node(app, ctx, img.into_rgba8());
-                        }
-                        Err(err) => {
-                            println!("Failed to load image from {:?}: {:?}", p, err);
-                        }
-                    }
-                } else {
-                    println!("Clipboard text is not a valid recognized file path or URI");
+            } else {
+                let p = std::path::PathBuf::from(first_line);
+                if p.is_absolute() {
+                    path = Some(p);
                 }
+            }
+            
+            if let Some(p) = path {
+                println!("Parsed file path from clipboard: {:?}", p);
+                match image::open(&p) {
+                    Ok(img) => {
+                        println!("Successfully loaded image from {:?}", p);
+                        add_image_node(app, ctx, img.into_rgba8());
+                    }
+                    Err(err) => {
+                        println!("Failed to load image from {:?}: {:?}", p, err);
+                    }
+                }
+            } else {
+                println!("Clipboard text is not a valid recognized file path or URI");
             }
         }
     }

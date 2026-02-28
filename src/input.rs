@@ -2,8 +2,22 @@ use egui::Context;
 use crate::app::PastePlateApp;
 
 pub fn handle_global_input(app: &mut PastePlateApp, ctx: &Context) {
-    if ctx.input(|i| i.events.iter().any(|e| matches!(e, egui::Event::Paste(_)))) {
-        println!("egui Event::Paste detected");
+    // Handle egui's native Paste event (works when egui intercepts Ctrl+V)
+    let mut paste_triggered = false;
+    ctx.input(|i| {
+        for event in &i.events {
+            if let egui::Event::Paste(text) = event {
+                println!("egui Event::Paste detected with text length: {}", text.len());
+                // Check if it looks like image data (base64 or raw bytes would be here)
+                // For now, trigger clipboard paste to handle image data
+                paste_triggered = true;
+            }
+        }
+    });
+    
+    if paste_triggered {
+        crate::clipboard::paste_from_clipboard(app, ctx);
+        return;
     }
 
     let paste_shortcut = egui::KeyboardShortcut::new(egui::Modifiers::CTRL, egui::Key::V);
