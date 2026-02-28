@@ -96,5 +96,12 @@ pub fn draw_canvas(app: &mut PastePlateApp, ctx: &Context) {
                 painter.rect_stroke(node_rect, 0.0, Stroke::new(2.0, Color32::YELLOW));
             }
         }
+        
+        response.context_menu(|ui| {
+            if ui.button("Paste").clicked() {
+                crate::clipboard::paste_from_clipboard(app, ctx);
+                ui.close_menu();
+            }
+        });
     });
 }

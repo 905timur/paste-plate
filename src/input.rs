@@ -2,7 +2,15 @@ use egui::Context;
 use crate::app::PastePlateApp;
 
 pub fn handle_global_input(app: &mut PastePlateApp, ctx: &Context) {
-    if ctx.input(|i| i.modifiers.ctrl && i.key_pressed(egui::Key::V)) {
+    if ctx.input(|i| i.events.iter().any(|e| matches!(e, egui::Event::Paste(_)))) {
+        println!("egui Event::Paste detected");
+    }
+
+    let paste_shortcut = egui::KeyboardShortcut::new(egui::Modifiers::CTRL, egui::Key::V);
+    let mac_paste_shortcut = egui::KeyboardShortcut::new(egui::Modifiers::MAC_CMD, egui::Key::V);
+    
+    if ctx.input_mut(|i| i.consume_shortcut(&paste_shortcut) || i.consume_shortcut(&mac_paste_shortcut)) {
+        println!("Ctrl+V / Cmd+V pressed (via shortcut)");
         crate::clipboard::paste_from_clipboard(app, ctx);
     }
     
@@ -10,7 +18,10 @@ pub fn handle_global_input(app: &mut PastePlateApp, ctx: &Context) {
         app.nodes.retain(|n| !n.selected);
     }
     
-    if ctx.input(|i| i.modifiers.ctrl && i.key_pressed(egui::Key::S)) {
+    let save_shortcut = egui::KeyboardShortcut::new(egui::Modifiers::CTRL, egui::Key::S);
+    let mac_save_shortcut = egui::KeyboardShortcut::new(egui::Modifiers::MAC_CMD, egui::Key::S);
+    
+    if ctx.input_mut(|i| i.consume_shortcut(&save_shortcut) || i.consume_shortcut(&mac_save_shortcut)) {
         export_canvas(app);
     }
 }

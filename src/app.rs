@@ -1,13 +1,11 @@
 use eframe::App;
 use egui::{Context, Vec2};
 use crate::node::ImageNode;
-use arboard::Clipboard;
 
 pub struct PastePlateApp {
     pub nodes: Vec<ImageNode>,
     pub canvas_offset: Vec2,
     pub canvas_zoom: f32,
-    pub clipboard: Option<Clipboard>,
     pub drag_state: Option<(usize, egui::Pos2)>,
     pub next_id: usize,
 }
@@ -18,7 +16,6 @@ impl PastePlateApp {
             nodes: Vec::new(),
             canvas_offset: Vec2::ZERO,
             canvas_zoom: 1.0,
-            clipboard: Clipboard::new().ok(),
             drag_state: None,
             next_id: 0,
         }
